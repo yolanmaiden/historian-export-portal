@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.domain.historian import OutputFormat, SampleInterval, ScalarValue, TagName
 
@@ -18,6 +18,20 @@ class HistorianQuery(StrictModel):
     end_datetime: datetime = Field(..., description="Inclusive end timestamp")
     tags: list[TagName] = Field(..., min_length=1)
     sample_interval: SampleInterval
+
+    @field_validator("start_datetime", "end_datetime")
+    @classmethod
+    def validate_timezone_aware_datetime(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("Datetime values must include a timezone offset.")
+        return value
+
+    @field_validator("tags")
+    @classmethod
+    def validate_unique_tags(cls, value: list[TagName]) -> list[TagName]:
+        if len(set(value)) != len(value):
+            raise ValueError("Tags must be unique.")
+        return value
 
     @model_validator(mode="after")
     def validate_window(self) -> "HistorianQuery":

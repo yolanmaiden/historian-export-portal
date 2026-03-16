@@ -6,37 +6,44 @@ import {
   SAMPLE_INTERVAL_OPTIONS,
 } from "./constants/historian";
 import { buildDefaultWindow } from "./lib/datetime";
+import {
+  buildExportRequest,
+  buildPreviewRequest,
+  DEFAULT_SELECTED_TAGS,
+  downloadBlob,
+  getExportFilename,
+  getPreviewValueColumns,
+  toggleTagSelection,
+  type HistorianQueryFormState,
+} from "./lib/historian";
 import type {
-  ExportRequest,
   OutputFormat,
-  PreviewColumn,
   PreviewResponse,
-  PreviewRequest,
   SampleInterval,
   TagInfo,
   TagName,
 } from "./types/historian";
 
 export default function App() {
-  const defaults = buildDefaultWindow();
-  const [tags, setTags] = useState<TagInfo[]>([]);
-  const [selectedTags, setSelectedTags] = useState<TagName[]>(["PT_1001", "TT_1002"]);
-  const [startDatetime, setStartDatetime] = useState(defaults.start);
-  const [endDatetime, setEndDatetime] = useState(defaults.end);
+  const defaultWindow = buildDefaultWindow();
+  const [availableTags, setAvailableTags] = useState<TagInfo[]>([]);
+  const [selectedTags, setSelectedTags] = useState<TagName[]>(DEFAULT_SELECTED_TAGS);
+  const [startDatetime, setStartDatetime] = useState(defaultWindow.start);
+  const [endDatetime, setEndDatetime] = useState(defaultWindow.end);
   const [sampleInterval, setSampleInterval] = useState<SampleInterval>("1m");
   const [outputFormat, setOutputFormat] = useState<OutputFormat>("csv");
-  const [preview, setPreview] = useState<PreviewResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [previewResponse, setPreviewResponse] = useState<PreviewResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadTags() {
       try {
         const result = await fetchTags();
-        setTags(result);
+        setAvailableTags(result);
       } catch (loadError) {
-        setError(
+        setErrorMessage(
           loadError instanceof Error ? loadError.message : "Failed to load tags.",
         );
       }
@@ -45,97 +52,75 @@ export default function App() {
     void loadTags();
   }, []);
 
-  function getPreviewTagColumns(columns: PreviewColumn[]): TagName[] {
-    return columns.filter((column): column is TagName => column !== "timestamp");
+  function buildFormState(): HistorianQueryFormState {
+    return {
+      startDatetime,
+      endDatetime,
+      selectedTags,
+      sampleInterval,
+    };
   }
 
   function toggleTag(tagName: TagName) {
-    setSelectedTags((current) =>
-      current.includes(tagName)
-        ? current.filter((tag) => tag !== tagName)
-        : [...current, tagName],
-    );
+    setSelectedTags((current) => toggleTagSelection(current, tagName));
   }
 
-  function buildPreviewRequest(): PreviewRequest | null {
-    setError(null);
+  function preparePreviewRequest() {
+    setErrorMessage(null);
     setStatusMessage(null);
 
-    if (!selectedTags.length) {
-      setError("Select at least one tag.");
-      return null;
+    const result = buildPreviewRequest(buildFormState());
+
+    if (result.errorMessage) {
+      setErrorMessage(result.errorMessage);
     }
 
-    const start = new Date(startDatetime);
-    const end = new Date(endDatetime);
-
-    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-      setError("Enter a valid start and end datetime.");
-      return null;
-    }
-
-    if (end <= start) {
-      setError("End time must be after start time.");
-      return null;
-    }
-
-    return {
-      start_datetime: start.toISOString(),
-      end_datetime: end.toISOString(),
-      tags: selectedTags,
-      sample_interval: sampleInterval,
-    };
-  }
-
-  function buildExportRequest(query: PreviewRequest): ExportRequest {
-    return {
-      ...query,
-      output_format: outputFormat,
-    };
+    return result.request;
   }
 
   async function handlePreview(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const request = buildPreviewRequest();
+    const request = preparePreviewRequest();
     if (!request) {
       return;
     }
 
-    setLoading(true);
+    setIsLoading(true);
 
     try {
       const result = await previewData(request);
-      setPreview(result);
+      setPreviewResponse(result);
       setStatusMessage(`Loaded ${result.rows.length} rows.`);
     } catch (previewError) {
-      setError(previewError instanceof Error ? previewError.message : "Preview failed.");
+      setErrorMessage(
+        previewError instanceof Error ? previewError.message : "Preview failed.",
+      );
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   }
 
   async function handleExport() {
-    const query = buildPreviewRequest();
-    if (!query) {
+    const previewRequest = preparePreviewRequest();
+    if (!previewRequest) {
       return;
     }
-    const request = buildExportRequest(query);
 
-    setLoading(true);
+    const exportRequest = buildExportRequest(previewRequest, outputFormat);
+    setIsLoading(true);
 
     try {
-      const file = await exportData(request);
-      const fileUrl = URL.createObjectURL(file);
-      const anchor = document.createElement("a");
-      anchor.href = fileUrl;
-      anchor.download = request.output_format === "csv" ? "historian-export.csv" : "historian-export.xlsx";
-      anchor.click();
-      URL.revokeObjectURL(fileUrl);
-      setStatusMessage(`Export generated as ${request.output_format.toUpperCase()}.`);
+      const file = await exportData(exportRequest);
+      downloadBlob(file, getExportFilename(exportRequest.output_format));
+      setStatusMessage(
+        `Export generated as ${exportRequest.output_format.toUpperCase()}.`,
+      );
     } catch (exportError) {
-      setError(exportError instanceof Error ? exportError.message : "Export failed.");
+      setErrorMessage(
+        exportError instanceof Error ? exportError.message : "Export failed.",
+      );
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   }
 
@@ -209,7 +194,7 @@ export default function App() {
                 <small>Choose one or more historian tags.</small>
               </div>
               <div className="tag-grid">
-                {tags.map((tag) => (
+                {availableTags.map((tag) => (
                   <label key={tag.name} className="tag-card">
                     <input
                       type="checkbox"
@@ -226,14 +211,19 @@ export default function App() {
               </div>
             </div>
 
-            {error ? <p className="message error">{error}</p> : null}
+            {errorMessage ? <p className="message error">{errorMessage}</p> : null}
             {statusMessage ? <p className="message success">{statusMessage}</p> : null}
 
             <div className="actions">
-              <button type="submit" disabled={loading}>
-                {loading ? "Loading..." : "Preview Data"}
+              <button type="submit" disabled={isLoading}>
+                {isLoading ? "Loading..." : "Preview Data"}
               </button>
-              <button type="button" className="secondary" disabled={loading} onClick={handleExport}>
+              <button
+                type="button"
+                className="secondary"
+                disabled={isLoading}
+                onClick={handleExport}
+              >
                 Export Data
               </button>
             </div>
@@ -248,21 +238,21 @@ export default function App() {
             </div>
           </div>
 
-          {preview ? (
+          {previewResponse ? (
             <div className="table-wrap">
               <table>
                 <thead>
                   <tr>
-                    {preview.columns.map((column) => (
+                    {previewResponse.columns.map((column) => (
                       <th key={column}>{column}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {preview.rows.map((row) => (
+                  {previewResponse.rows.map((row) => (
                     <tr key={row.timestamp}>
                       <td>{new Date(row.timestamp).toLocaleString()}</td>
-                      {getPreviewTagColumns(preview.columns).map((tag) => (
+                      {getPreviewValueColumns(previewResponse.columns).map((tag) => (
                         <td key={`${row.timestamp}-${tag}`}>{String(row.values[tag] ?? "")}</td>
                       ))}
                     </tr>

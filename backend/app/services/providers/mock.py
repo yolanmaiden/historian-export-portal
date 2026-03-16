@@ -1,46 +1,88 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from collections.abc import Callable
+from datetime import datetime
 
-from app.domain.historian import MAX_PREVIEW_ROWS, SampleInterval, TagName
+from app.domain.historian import (
+    MAX_PREVIEW_ROWS,
+    SAMPLE_INTERVAL_TO_TIMEDELTA,
+    ScalarValue,
+    TagName,
+)
 from app.schemas.historian import HistorianQuery, PreviewRow, TagInfo
 from app.services.interfaces import HistorianService
 
+TagValueBuilder = Callable[[datetime, int], ScalarValue]
+
+
+def _build_pressure_value(timestamp: datetime, row_index: int) -> float:
+    minute_seed = timestamp.minute + timestamp.hour * 60
+    return round(8.5 + ((minute_seed % 9) * 0.14) + row_index * 0.02, 2)
+
+
+def _build_temperature_value(timestamp: datetime, row_index: int) -> float:
+    minute_seed = timestamp.minute + timestamp.hour * 60
+    return round(145 + ((minute_seed % 11) * 0.8) + row_index * 0.05, 2)
+
+
+def _build_flow_value(timestamp: datetime, row_index: int) -> float:
+    minute_seed = timestamp.minute + timestamp.hour * 60
+    return round(32 + ((minute_seed % 7) * 0.6) + row_index * 0.03, 2)
+
+
+def _build_open_status_value(_: datetime, row_index: int) -> int:
+    return 1 if row_index % 6 < 4 else 0
+
+
+def _build_closed_status_value(_: datetime, row_index: int) -> int:
+    return 0 if row_index % 6 < 4 else 1
+
+
+MOCK_TAG_CATALOG: tuple[TagInfo, ...] = (
+    TagInfo(
+        name=TagName.pt_1001,
+        description="Reactor pressure",
+        engineering_unit="bar",
+    ),
+    TagInfo(
+        name=TagName.tt_1002,
+        description="Reactor temperature",
+        engineering_unit="degC",
+    ),
+    TagInfo(
+        name=TagName.ft_1104,
+        description="Feed flow",
+        engineering_unit="m3/h",
+    ),
+    TagInfo(
+        name=TagName.zso_2101,
+        description="Valve open status",
+        engineering_unit="state",
+    ),
+    TagInfo(
+        name=TagName.zsc_2101,
+        description="Valve closed status",
+        engineering_unit="state",
+    ),
+)
+
+MOCK_VALUE_BUILDERS: dict[TagName, TagValueBuilder] = {
+    TagName.pt_1001: _build_pressure_value,
+    TagName.tt_1002: _build_temperature_value,
+    TagName.ft_1104: _build_flow_value,
+    TagName.zso_2101: _build_open_status_value,
+    TagName.zsc_2101: _build_closed_status_value,
+}
+
 
 class MockHistorianService(HistorianService):
-    _tag_catalog: tuple[TagInfo, ...] = (
-        TagInfo(
-            name=TagName.pt_1001,
-            description="Reactor pressure",
-            engineering_unit="bar",
-        ),
-        TagInfo(
-            name=TagName.tt_1002,
-            description="Reactor temperature",
-            engineering_unit="degC",
-        ),
-        TagInfo(
-            name=TagName.ft_1104,
-            description="Feed flow",
-            engineering_unit="m3/h",
-        ),
-        TagInfo(
-            name=TagName.zso_2101,
-            description="Valve open status",
-            engineering_unit="state",
-        ),
-        TagInfo(
-            name=TagName.zsc_2101,
-            description="Valve closed status",
-            engineering_unit="state",
-        ),
-    )
+    _tag_catalog: tuple[TagInfo, ...] = MOCK_TAG_CATALOG
 
     def list_tags(self) -> list[TagInfo]:
         return list(self._tag_catalog)
 
     def query_data(self, request: HistorianQuery) -> list[PreviewRow]:
-        timestamps = self._build_timestamps(request)
+        timestamps = self._build_timestamp_series(request)
         return [
             PreviewRow(
                 timestamp=timestamp,
@@ -52,8 +94,8 @@ class MockHistorianService(HistorianService):
             for index, timestamp in enumerate(timestamps)
         ]
 
-    def _build_timestamps(self, request: HistorianQuery) -> list[datetime]:
-        step = self._resolve_timedelta(request.sample_interval)
+    def _build_timestamp_series(self, request: HistorianQuery) -> list[datetime]:
+        step = SAMPLE_INTERVAL_TO_TIMEDELTA[request.sample_interval]
         timestamps: list[datetime] = []
         current = request.start_datetime
 
@@ -64,23 +106,5 @@ class MockHistorianService(HistorianService):
         return timestamps
 
     @staticmethod
-    def _resolve_timedelta(interval: SampleInterval) -> timedelta:
-        if interval in {SampleInterval.raw, SampleInterval.one_second}:
-            return timedelta(seconds=1)
-        if interval == SampleInterval.five_seconds:
-            return timedelta(seconds=5)
-        return timedelta(minutes=1)
-
-    @staticmethod
-    def _mock_value(tag: TagName, timestamp: datetime, row_index: int) -> float | int:
-        minute_seed = timestamp.minute + timestamp.hour * 60
-
-        if tag == TagName.pt_1001:
-            return round(8.5 + ((minute_seed % 9) * 0.14) + row_index * 0.02, 2)
-        if tag == TagName.tt_1002:
-            return round(145 + ((minute_seed % 11) * 0.8) + row_index * 0.05, 2)
-        if tag == TagName.ft_1104:
-            return round(32 + ((minute_seed % 7) * 0.6) + row_index * 0.03, 2)
-        if tag == TagName.zso_2101:
-            return 1 if row_index % 6 < 4 else 0
-        return 0 if row_index % 6 < 4 else 1
+    def _mock_value(tag: TagName, timestamp: datetime, row_index: int) -> ScalarValue:
+        return MOCK_VALUE_BUILDERS[tag](timestamp, row_index)

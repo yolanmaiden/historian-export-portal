@@ -1,5 +1,5 @@
 class AppError(Exception):
-    status_code = 500
+    status_code: int = 500
 
     def __init__(self, detail: str):
         super().__init__(detail)

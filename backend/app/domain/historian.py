@@ -1,5 +1,8 @@
+from datetime import timedelta
 from enum import StrEnum
 
+TIMESTAMP_COLUMN = "timestamp"
+DEFAULT_EXPORT_BASENAME = "historian-export"
 MAX_PREVIEW_ROWS = 200
 
 
@@ -24,3 +27,15 @@ class TagName(StrEnum):
 
 
 ScalarValue = float | int | str | bool | None
+
+SAMPLE_INTERVAL_TO_TIMEDELTA: dict[SampleInterval, timedelta] = {
+    SampleInterval.raw: timedelta(seconds=1),
+    SampleInterval.one_second: timedelta(seconds=1),
+    SampleInterval.five_seconds: timedelta(seconds=5),
+    SampleInterval.one_minute: timedelta(minutes=1),
+}
+
+EXPORT_FILENAMES: dict[OutputFormat, str] = {
+    OutputFormat.csv: f"{DEFAULT_EXPORT_BASENAME}.csv",
+    OutputFormat.xlsx: f"{DEFAULT_EXPORT_BASENAME}.xlsx",
+}

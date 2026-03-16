@@ -3,7 +3,7 @@ from fastapi.responses import StreamingResponse
 
 from app.api.dependencies import HistorianServiceDep
 from app.core.exceptions import UnsupportedExportFormatError
-from app.domain.historian import OutputFormat
+from app.domain.historian import EXPORT_FILENAMES, OutputFormat
 from app.schemas.historian import ExportRequest, PreviewRequest, PreviewResponse
 from app.services.serializers import build_csv_export, build_preview_response
 
@@ -29,7 +29,11 @@ def export_data(
 
     rows = historian_service.query_data(request)
     csv_content = build_csv_export(request, rows)
-    headers = {"Content-Disposition": 'attachment; filename="historian-export.csv"'}
+    headers = {
+        "Content-Disposition": (
+            f'attachment; filename="{EXPORT_FILENAMES[request.output_format]}"'
+        )
+    }
     return StreamingResponse(
         iter([csv_content.encode("utf-8")]),
         media_type="text/csv",
