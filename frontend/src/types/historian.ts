@@ -5,6 +5,7 @@ export type TagName =
   | "ZSO_2101"
   | "ZSC_2101";
 
+export type RetrievalMode = "delta" | "cyclic";
 export type SampleInterval = "raw" | "1s" | "5s" | "1m";
 export type OutputFormat = "csv" | "xlsx";
 export type ScalarValue = string | number | boolean | null;
@@ -20,7 +21,9 @@ export interface HistorianQuery {
   start_datetime: string;
   end_datetime: string;
   tags: TagName[];
-  sample_interval: SampleInterval;
+  retrieval_mode: RetrievalMode;
+  cycle_seconds?: number | null;
+  sample_interval?: SampleInterval;
 }
 
 export type PreviewRequest = HistorianQuery;

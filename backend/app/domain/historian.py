@@ -13,6 +13,11 @@ class SampleInterval(StrEnum):
     one_minute = "1m"
 
 
+class RetrievalMode(StrEnum):
+    delta = "delta"
+    cyclic = "cyclic"
+
+
 class OutputFormat(StrEnum):
     csv = "csv"
     xlsx = "xlsx"
@@ -27,6 +32,7 @@ class TagName(StrEnum):
 
 
 ScalarValue = float | int | str | bool | None
+DEFAULT_DELTA_SAMPLE_INTERVAL = SampleInterval.raw
 
 SAMPLE_INTERVAL_TO_TIMEDELTA: dict[SampleInterval, timedelta] = {
     SampleInterval.raw: timedelta(seconds=1),

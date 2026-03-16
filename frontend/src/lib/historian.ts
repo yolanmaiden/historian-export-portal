@@ -3,22 +3,28 @@ import type {
   OutputFormat,
   PreviewColumn,
   PreviewRequest,
-  SampleInterval,
+  RetrievalMode,
   TagName,
 } from "../types/historian";
 
 export const DEFAULT_SELECTED_TAGS: TagName[] = ["PT_1001", "TT_1002"];
+export type RetrievalSelection = "delta" | "cyclic-1s";
 
 export interface HistorianQueryFormState {
   startDatetime: string;
   endDatetime: string;
   selectedTags: TagName[];
-  sampleInterval: SampleInterval;
+  retrievalSelection: RetrievalSelection;
 }
 
 interface RequestBuildResult {
   errorMessage: string | null;
   request: PreviewRequest | null;
+}
+
+interface RetrievalParameters {
+  retrievalMode: RetrievalMode;
+  cycleSeconds: number | null;
 }
 
 export function getPreviewValueColumns(columns: PreviewColumn[]): TagName[] {
@@ -29,6 +35,22 @@ export function toggleTagSelection(selectedTags: TagName[], tagName: TagName): T
   return selectedTags.includes(tagName)
     ? selectedTags.filter((tag) => tag !== tagName)
     : [...selectedTags, tagName];
+}
+
+export function getRetrievalParameters(
+  retrievalSelection: RetrievalSelection,
+): RetrievalParameters {
+  if (retrievalSelection === "cyclic-1s") {
+    return {
+      retrievalMode: "cyclic",
+      cycleSeconds: 1,
+    };
+  }
+
+  return {
+    retrievalMode: "delta",
+    cycleSeconds: null,
+  };
 }
 
 export function buildPreviewRequest(
@@ -58,13 +80,18 @@ export function buildPreviewRequest(
     };
   }
 
+  const { retrievalMode, cycleSeconds } = getRetrievalParameters(
+    formState.retrievalSelection,
+  );
+
   return {
     errorMessage: null,
     request: {
       start_datetime: start.toISOString(),
       end_datetime: end.toISOString(),
       tags: formState.selectedTags,
-      sample_interval: formState.sampleInterval,
+      retrieval_mode: retrievalMode,
+      cycle_seconds: cycleSeconds,
     },
   };
 }

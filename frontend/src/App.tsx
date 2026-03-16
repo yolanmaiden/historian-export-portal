@@ -3,7 +3,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { exportData, fetchTags, previewData } from "./api/historian";
 import {
   OUTPUT_FORMAT_OPTIONS,
-  SAMPLE_INTERVAL_OPTIONS,
+  RETRIEVAL_OPTIONS,
 } from "./constants/historian";
 import { buildDefaultWindow } from "./lib/datetime";
 import {
@@ -15,11 +15,11 @@ import {
   getPreviewValueColumns,
   toggleTagSelection,
   type HistorianQueryFormState,
+  type RetrievalSelection,
 } from "./lib/historian";
 import type {
   OutputFormat,
   PreviewResponse,
-  SampleInterval,
   TagInfo,
   TagName,
 } from "./types/historian";
@@ -30,7 +30,8 @@ export default function App() {
   const [selectedTags, setSelectedTags] = useState<TagName[]>(DEFAULT_SELECTED_TAGS);
   const [startDatetime, setStartDatetime] = useState(defaultWindow.start);
   const [endDatetime, setEndDatetime] = useState(defaultWindow.end);
-  const [sampleInterval, setSampleInterval] = useState<SampleInterval>("1m");
+  const [retrievalSelection, setRetrievalSelection] =
+    useState<RetrievalSelection>("delta");
   const [outputFormat, setOutputFormat] = useState<OutputFormat>("csv");
   const [previewResponse, setPreviewResponse] = useState<PreviewResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -57,7 +58,7 @@ export default function App() {
       startDatetime,
       endDatetime,
       selectedTags,
-      sampleInterval,
+      retrievalSelection,
     };
   }
 
@@ -160,12 +161,14 @@ export default function App() {
               </label>
 
               <label className="field">
-                <span>Sample interval</span>
+                <span>Retrieval mode</span>
                 <select
-                  value={sampleInterval}
-                  onChange={(event) => setSampleInterval(event.target.value as SampleInterval)}
+                  value={retrievalSelection}
+                  onChange={(event) =>
+                    setRetrievalSelection(event.target.value as RetrievalSelection)
+                  }
                 >
-                  {SAMPLE_INTERVAL_OPTIONS.map((option) => (
+                  {RETRIEVAL_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
                     </option>

@@ -12,3 +12,7 @@ class ConfigurationError(AppError):
 
 class UnsupportedExportFormatError(AppError):
     status_code = 501
+
+
+class UnsupportedRetrievalModeError(AppError):
+    status_code = 501

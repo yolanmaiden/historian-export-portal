@@ -9,5 +9,6 @@ class HistorianService(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def query_data(self, request: HistorianQuery) -> list[PreviewRow]:
+    def query_data(self, query: HistorianQuery) -> list[PreviewRow]:
+        """Run a historian query, including retrieval-mode-specific options."""
         raise NotImplementedError

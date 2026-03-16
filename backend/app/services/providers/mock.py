@@ -3,8 +3,11 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import datetime
 
+from app.core.exceptions import UnsupportedRetrievalModeError
 from app.domain.historian import (
+    DEFAULT_DELTA_SAMPLE_INTERVAL,
     MAX_PREVIEW_ROWS,
+    RetrievalMode,
     SAMPLE_INTERVAL_TO_TIMEDELTA,
     ScalarValue,
     TagName,
@@ -82,6 +85,11 @@ class MockHistorianService(HistorianService):
         return list(self._tag_catalog)
 
     def query_data(self, request: HistorianQuery) -> list[PreviewRow]:
+        if request.retrieval_mode == RetrievalMode.cyclic:
+            raise UnsupportedRetrievalModeError(
+                "Cyclic retrieval is not implemented yet for the mock historian provider."
+            )
+
         timestamps = self._build_timestamp_series(request)
         return [
             PreviewRow(
@@ -95,7 +103,9 @@ class MockHistorianService(HistorianService):
         ]
 
     def _build_timestamp_series(self, request: HistorianQuery) -> list[datetime]:
-        step = SAMPLE_INTERVAL_TO_TIMEDELTA[request.sample_interval]
+        step = SAMPLE_INTERVAL_TO_TIMEDELTA[
+            request.sample_interval or DEFAULT_DELTA_SAMPLE_INTERVAL
+        ]
         timestamps: list[datetime] = []
         current = request.start_datetime
 

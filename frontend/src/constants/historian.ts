@@ -1,13 +1,12 @@
-import type { OutputFormat, SampleInterval } from "../types/historian";
+import type { OutputFormat } from "../types/historian";
+import type { RetrievalSelection } from "../lib/historian";
 
-export const SAMPLE_INTERVAL_OPTIONS: ReadonlyArray<{
+export const RETRIEVAL_OPTIONS: ReadonlyArray<{
   label: string;
-  value: SampleInterval;
+  value: RetrievalSelection;
 }> = [
-  { label: "Raw", value: "raw" },
-  { label: "1 second", value: "1s" },
-  { label: "5 seconds", value: "5s" },
-  { label: "1 minute", value: "1m" },
+  { label: "Raw/Delta", value: "delta" },
+  { label: "1 second cyclic", value: "cyclic-1s" },
 ];
 
 export const OUTPUT_FORMAT_OPTIONS: ReadonlyArray<{
