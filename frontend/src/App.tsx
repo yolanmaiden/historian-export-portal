@@ -186,7 +186,7 @@ export default function App() {
         <section className="panel controls-panel">
           <form className="controls-form" onSubmit={handlePreview}>
             <div className="field-grid">
-              <label className="field">
+              <label className="field field-datetime">
                 <span>Start datetime</span>
                 <input
                   type="datetime-local"
@@ -198,7 +198,7 @@ export default function App() {
                 />
               </label>
 
-              <label className="field">
+              <label className="field field-datetime">
                 <span>End datetime</span>
                 <input
                   type="datetime-local"
@@ -212,7 +212,7 @@ export default function App() {
 
               <label className="field">
                 <span>Retrieval mode</span>
-                <input type="text" value="Cyclic" readOnly />
+                <div className="field-static-value">Cyclic</div>
               </label>
 
               <label className="field">

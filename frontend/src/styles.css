@@ -121,6 +121,10 @@ select {
   min-width: 0;
 }
 
+.field-datetime {
+  grid-column: 1 / -1;
+}
+
 .field span,
 .field-header span,
 .selected-tags-header span {
@@ -130,6 +134,7 @@ select {
 
 .field input,
 .field select,
+.field-static-value,
 .tag-search {
   width: 100%;
   min-width: 0;
@@ -144,8 +149,8 @@ select {
 .field select:focus,
 .tag-search:focus {
   outline: none;
-  box-shadow: 0 0 0 2px #7db4ff;
-  border-color: transparent;
+  box-shadow: inset 0 0 0 1px #7db4ff;
+  border-color: #7db4ff;
 }
 
 .field input[readonly] {
@@ -153,8 +158,13 @@ select {
   background: #eef5ff;
 }
 
+.field-static-value {
+  font-weight: 600;
+  background: #eef5ff;
+}
+
 .field input[type="datetime-local"] {
-  padding-right: 26px;
+  padding-right: 12px;
 }
 
 .field-header {
