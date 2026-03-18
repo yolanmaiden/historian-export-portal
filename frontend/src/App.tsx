@@ -1,10 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 
 import { exportData, fetchTags, previewData } from "./api/historian";
-import {
-  OUTPUT_FORMAT_OPTIONS,
-  RETRIEVAL_OPTIONS,
-} from "./constants/historian";
+import { OUTPUT_FORMAT_OPTIONS } from "./constants/historian";
 import { buildDefaultWindow, buildRelativeWindow } from "./lib/datetime";
 import {
   buildExportRequest,
@@ -19,7 +16,6 @@ import {
   normalizeTagMetadataList,
   toggleTagSelection,
   type HistorianQueryFormState,
-  type RetrievalSelection,
 } from "./lib/historian";
 import type {
   OutputFormat,
@@ -45,8 +41,6 @@ export default function App() {
   const [startDatetime, setStartDatetime] = useState(defaultWindow.start);
   const [endDatetime, setEndDatetime] = useState(defaultWindow.end);
   const [resolutionMilliseconds, setResolutionMilliseconds] = useState("1000");
-  const [retrievalSelection, setRetrievalSelection] =
-    useState<RetrievalSelection>("delta");
   const [outputFormat, setOutputFormat] = useState<OutputFormat>("csv");
   const [previewResponse, setPreviewResponse] = useState<PreviewResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -93,7 +87,7 @@ export default function App() {
       startDatetime,
       endDatetime,
       selectedTags,
-      retrievalSelection,
+      retrievalSelection: "cyclic",
       resolutionMilliseconds,
     };
   }
@@ -208,32 +202,19 @@ export default function App() {
 
               <label className="field">
                 <span>Retrieval mode</span>
-                <select
-                  value={retrievalSelection}
-                  onChange={(event) =>
-                    setRetrievalSelection(event.target.value as RetrievalSelection)
-                  }
-                >
-                  {RETRIEVAL_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                <input type="text" value="Cyclic" readOnly />
               </label>
 
-              {retrievalSelection === "cyclic" ? (
-                <label className="field">
-                  <span>Resolution (ms)</span>
-                  <input
-                    type="number"
-                    min="1"
-                    step="1"
-                    value={resolutionMilliseconds}
-                    onChange={(event) => setResolutionMilliseconds(event.target.value)}
-                  />
-                </label>
-              ) : null}
+              <label className="field">
+                <span>Resolution (ms)</span>
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={resolutionMilliseconds}
+                  onChange={(event) => setResolutionMilliseconds(event.target.value)}
+                />
+              </label>
 
               <label className="field">
                 <span>Output format</span>

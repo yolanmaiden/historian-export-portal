@@ -9,7 +9,7 @@ import type {
 } from "../types/historian";
 
 export const DEFAULT_SELECTED_TAGS: TagName[] = [];
-export type RetrievalSelection = "delta" | "cyclic";
+export type RetrievalSelection = "cyclic";
 
 export interface HistorianQueryFormState {
   startDatetime: string;
@@ -105,19 +105,11 @@ export function matchesTagSearch(tag: TagMetadata, searchText: string): boolean 
 }
 
 export function getRetrievalParameters(
-  retrievalSelection: RetrievalSelection,
   resolutionMillisecondsInput: string,
 ): RetrievalParameters {
-  if (retrievalSelection === "cyclic") {
-    return {
-      retrievalMode: "cyclic",
-      resolutionMilliseconds: Number.parseInt(resolutionMillisecondsInput, 10),
-    };
-  }
-
   return {
-    retrievalMode: "delta",
-    resolutionMilliseconds: null,
+    retrievalMode: "cyclic",
+    resolutionMilliseconds: Number.parseInt(resolutionMillisecondsInput, 10),
   };
 }
 
@@ -149,21 +141,18 @@ export function buildPreviewRequest(
   }
 
   const { retrievalMode, resolutionMilliseconds } = getRetrievalParameters(
-    formState.retrievalSelection,
     formState.resolutionMilliseconds,
   );
 
-  if (retrievalMode === "cyclic") {
-    if (
-      !Number.isInteger(resolutionMilliseconds) ||
-      resolutionMilliseconds === null ||
-      resolutionMilliseconds < 1
-    ) {
-      return {
-        errorMessage: "Enter a valid cyclic resolution in milliseconds.",
-        request: null,
-      };
-    }
+  if (
+    !Number.isInteger(resolutionMilliseconds) ||
+    resolutionMilliseconds === null ||
+    resolutionMilliseconds < 1
+  ) {
+    return {
+      errorMessage: "Enter a valid cyclic resolution in milliseconds.",
+      request: null,
+    };
   }
 
   return {

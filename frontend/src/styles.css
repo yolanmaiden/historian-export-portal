@@ -20,7 +20,8 @@
 body {
   margin: 0;
   min-width: 320px;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
 }
 
 button,
@@ -30,7 +31,7 @@ select {
 }
 
 #root {
-  min-height: 100vh;
+  height: 100vh;
 }
 
 .app-shell {
@@ -38,7 +39,9 @@ select {
   flex-direction: column;
   max-width: 1400px;
   margin: 0 auto;
-  min-height: 100vh;
+  height: 100vh;
+  min-height: 0;
+  overflow: hidden;
   padding: 32px 20px 48px;
 }
 
@@ -451,6 +454,22 @@ tbody tr:nth-child(even) {
 }
 
 @media (max-width: 980px) {
+  body {
+    height: auto;
+    overflow: auto;
+  }
+
+  #root {
+    height: auto;
+    min-height: 100vh;
+  }
+
+  .app-shell {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
   .dashboard {
     flex-direction: column;
     min-height: auto;
