@@ -21,6 +21,7 @@ body {
   margin: 0;
   min-width: 320px;
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
 }
 
@@ -32,6 +33,7 @@ select {
 
 #root {
   height: 100vh;
+  height: 100dvh;
 }
 
 .app-shell {
@@ -40,6 +42,7 @@ select {
   max-width: 1400px;
   margin: 0 auto;
   height: 100vh;
+  height: 100dvh;
   min-height: 0;
   overflow: hidden;
   padding: 32px 20px 48px;
@@ -76,7 +79,7 @@ select {
 .dashboard {
   display: flex;
   align-items: stretch;
-  flex: 1;
+  flex: 1 1 0;
   gap: 24px;
   min-height: 0;
   overflow: hidden;
@@ -105,7 +108,11 @@ select {
   flex: 1;
   gap: 20px;
   min-height: 0;
-  overflow: hidden;
+  overflow-x: visible;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+  padding-right: 4px;
 }
 
 .field-grid {
@@ -483,6 +490,68 @@ tbody tr:nth-child(even) {
   min-height: 320px;
 }
 
+@media (max-height: 900px) {
+  .app-shell {
+    padding: 20px 16px 24px;
+  }
+
+  .hero {
+    margin-bottom: 16px;
+    padding: 18px 22px;
+  }
+
+  .hero h1 {
+    margin: 6px 0 8px;
+    font-size: clamp(1.75rem, 3vw, 2.4rem);
+  }
+
+  .hero-copy {
+    max-width: 640px;
+  }
+
+  .dashboard {
+    gap: 18px;
+  }
+
+  .controls-panel,
+  .preview-panel {
+    padding: 18px;
+  }
+
+  .controls-form {
+    gap: 16px;
+    padding-right: 2px;
+  }
+
+  .field-grid {
+    gap: 12px;
+  }
+
+  .preset-panel,
+  .actions-panel,
+  .selected-tags-panel {
+    padding: 14px;
+  }
+
+  .actions-panel {
+    top: 12px;
+  }
+
+  .selected-tags-list {
+    max-height: 84px;
+  }
+
+  .tag-panel {
+    flex: 0 0 auto;
+  }
+
+  .tag-results {
+    flex: 0 0 auto;
+    min-height: 180px;
+    max-height: min(34vh, 320px);
+  }
+}
+
 @media (max-width: 980px) {
   body {
     height: auto;
@@ -513,6 +582,11 @@ tbody tr:nth-child(even) {
   .controls-panel {
     flex-basis: auto;
     overflow: visible;
+  }
+
+  .controls-form {
+    overflow: visible;
+    padding-right: 0;
   }
 
   .table-wrap {
