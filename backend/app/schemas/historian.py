@@ -31,10 +31,15 @@ class HistorianQuery(StrictModel):
     end_datetime: datetime = Field(..., description="Inclusive end timestamp")
     tags: list[TagName] = Field(..., min_length=1)
     retrieval_mode: RetrievalMode = RetrievalMode.delta
+    resolution_milliseconds: int | None = Field(
+        default=None,
+        ge=1,
+        description="Cycle interval in milliseconds for cyclic retrieval.",
+    )
     cycle_seconds: int | None = Field(
         default=None,
         ge=1,
-        description="Cycle interval in seconds for cyclic retrieval.",
+        description="Legacy cycle interval in seconds for cyclic retrieval.",
     )
 
     @field_validator("start_datetime", "end_datetime")
@@ -65,13 +70,28 @@ class HistorianQuery(StrictModel):
     def validate_window(self) -> "HistorianQuery":
         if self.end_datetime <= self.start_datetime:
             raise ValueError("End time must be after start time.")
-        if self.retrieval_mode == RetrievalMode.cyclic and self.cycle_seconds is None:
+        if (
+            self.retrieval_mode == RetrievalMode.cyclic
+            and self.resolution_milliseconds is None
+            and self.cycle_seconds is not None
+        ):
+            self.resolution_milliseconds = self.cycle_seconds * 1000
+        if (
+            self.retrieval_mode == RetrievalMode.cyclic
+            and self.resolution_milliseconds is None
+        ):
             raise ValueError(
-                "cycle_seconds is required when retrieval_mode is cyclic."
+                "resolution_milliseconds is required when retrieval_mode is cyclic."
             )
-        if self.retrieval_mode != RetrievalMode.cyclic and self.cycle_seconds is not None:
+        if (
+            self.retrieval_mode != RetrievalMode.cyclic
+            and (
+                self.resolution_milliseconds is not None
+                or self.cycle_seconds is not None
+            )
+        ):
             raise ValueError(
-                "cycle_seconds is only supported when retrieval_mode is cyclic."
+                "Cyclic resolution is only supported when retrieval_mode is cyclic."
             )
         return self
 

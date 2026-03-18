@@ -8,14 +8,15 @@ import type {
   TagName,
 } from "../types/historian";
 
-export const DEFAULT_SELECTED_TAGS: TagName[] = ["PT_1001", "TT_1002"];
-export type RetrievalSelection = "raw" | "delta" | "cyclic-1s";
+export const DEFAULT_SELECTED_TAGS: TagName[] = [];
+export type RetrievalSelection = "delta" | "cyclic";
 
 export interface HistorianQueryFormState {
   startDatetime: string;
   endDatetime: string;
   selectedTags: TagName[];
   retrievalSelection: RetrievalSelection;
+  resolutionMilliseconds: string;
 }
 
 interface RequestBuildResult {
@@ -25,7 +26,7 @@ interface RequestBuildResult {
 
 interface RetrievalParameters {
   retrievalMode: RetrievalMode;
-  cycleSeconds: number | null;
+  resolutionMilliseconds: number | null;
 }
 
 function normalizeText(value: string | null | undefined): string {
@@ -36,6 +37,13 @@ export function getTagIdentifier(
   tag: Pick<TagMetadata, "tag_name" | "name">,
 ): TagName {
   return normalizeText(tag.tag_name) || normalizeText(tag.name);
+}
+
+export function isSystemTag(
+  tag: Pick<TagMetadata, "tag_name" | "name">,
+): boolean {
+  const normalizedTagName = getTagIdentifier(tag).toLowerCase();
+  return normalizedTagName.startsWith("$") || normalizedTagName.startsWith("sys");
 }
 
 export function normalizeTagMetadata(tag: TagMetadata): TagMetadata | null {
@@ -98,24 +106,18 @@ export function matchesTagSearch(tag: TagMetadata, searchText: string): boolean 
 
 export function getRetrievalParameters(
   retrievalSelection: RetrievalSelection,
+  resolutionMillisecondsInput: string,
 ): RetrievalParameters {
-  if (retrievalSelection === "raw") {
-    return {
-      retrievalMode: "raw",
-      cycleSeconds: null,
-    };
-  }
-
-  if (retrievalSelection === "cyclic-1s") {
+  if (retrievalSelection === "cyclic") {
     return {
       retrievalMode: "cyclic",
-      cycleSeconds: 1,
+      resolutionMilliseconds: Number.parseInt(resolutionMillisecondsInput, 10),
     };
   }
 
   return {
     retrievalMode: "delta",
-    cycleSeconds: null,
+    resolutionMilliseconds: null,
   };
 }
 
@@ -146,9 +148,23 @@ export function buildPreviewRequest(
     };
   }
 
-  const { retrievalMode, cycleSeconds } = getRetrievalParameters(
+  const { retrievalMode, resolutionMilliseconds } = getRetrievalParameters(
     formState.retrievalSelection,
+    formState.resolutionMilliseconds,
   );
+
+  if (retrievalMode === "cyclic") {
+    if (
+      !Number.isInteger(resolutionMilliseconds) ||
+      resolutionMilliseconds === null ||
+      resolutionMilliseconds < 1
+    ) {
+      return {
+        errorMessage: "Enter a valid cyclic resolution in milliseconds.",
+        request: null,
+      };
+    }
+  }
 
   return {
     errorMessage: null,
@@ -157,7 +173,7 @@ export function buildPreviewRequest(
       end_datetime: end.toISOString(),
       tags: formState.selectedTags,
       retrieval_mode: retrievalMode,
-      cycle_seconds: cycleSeconds,
+      resolution_milliseconds: resolutionMilliseconds,
     },
   };
 }

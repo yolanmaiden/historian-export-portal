@@ -19,7 +19,7 @@ export interface HistorianQuery {
   end_datetime: string;
   tags: TagName[];
   retrieval_mode: RetrievalMode;
-  cycle_seconds?: number | null;
+  resolution_milliseconds?: number | null;
 }
 
 export type PreviewRequest = HistorianQuery;

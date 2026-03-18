@@ -4,6 +4,7 @@ import logging
 from collections import OrderedDict
 from contextlib import closing
 from datetime import datetime
+from time import perf_counter
 from typing import Any, Iterable
 
 from app.core.config import Settings
@@ -37,10 +38,13 @@ class AvevaHistorianOdbcProvider(HistorianService):
         self._dsn = settings.historian_odbc_dsn or ""
         self._connection_string = self._build_connection_string(settings)
         self._query_timeout_seconds = settings.historian_query_timeout_seconds
+        self._preview_max_rows = settings.historian_preview_max_rows
         logger.info(
-            "Initialized AVEVA ODBC provider for DSN '%s' with %s second timeout",
+            "Initialized AVEVA ODBC provider for DSN '%s' with %s second timeout "
+            "and preview cap of %s raw rows",
             self._dsn,
             self._query_timeout_seconds,
+            self._preview_max_rows,
         )
 
     def list_tags(self) -> list[TagMetadata]:
@@ -78,44 +82,108 @@ class AvevaHistorianOdbcProvider(HistorianService):
         ]
 
     def preview_data(self, request: PreviewRequest) -> list[PreviewRow]:
-        return self._query_historical_rows(request)
+        return self._query_historical_rows(
+            request,
+            operation_name="preview",
+            preview_row_cap=self._preview_max_rows,
+        )
 
     def export_data(self, request: ExportRequest) -> list[PreviewRow]:
-        return self._query_historical_rows(request)
+        return self._query_historical_rows(request, operation_name="export")
 
     def query_data(self, query: HistorianQuery) -> list[PreviewRow]:
-        return self._query_historical_rows(query)
+        return self._query_historical_rows(query, operation_name="query")
 
-    def _query_historical_rows(self, query: HistorianQuery) -> list[PreviewRow]:
+    def _query_historical_rows(
+        self,
+        query: HistorianQuery,
+        *,
+        operation_name: str,
+        preview_row_cap: int | None = None,
+    ) -> list[PreviewRow]:
+        total_start = perf_counter()
         logger.info(
-            "Executing %s retrieval through AVEVA ODBC for %s tag(s) on DSN '%s' "
-            "from %s to %s",
-            str(query.retrieval_mode),
+            "Executing AVEVA ODBC %s for %s tag(s) on DSN '%s' from %s to %s "
+            "using %s retrieval",
+            operation_name,
             len(query.tags),
             self._dsn,
             query.start_datetime.isoformat(),
             query.end_datetime.isoformat(),
+            str(query.retrieval_mode),
         )
         if query.retrieval_mode == RetrievalMode.raw:
             raise NotImplementedError(
                 "Raw retrieval is not implemented yet for the AVEVA Historian ODBC provider."
             )
-        if query.retrieval_mode == RetrievalMode.cyclic:
-            raise NotImplementedError(
-                "Cyclic retrieval is not implemented yet for the AVEVA Historian ODBC provider."
-            )
 
-        sql = self._build_delta_query(tag_count=len(query.tags))
-        parameters = [*query.tags, query.start_datetime, query.end_datetime]
-        rows = self._execute_query(
-            sql,
-            parameters=parameters,
-            failure_message=(
+        if query.retrieval_mode == RetrievalMode.cyclic:
+            sql = self._build_cyclic_query(query)
+            parameters: list[Any] = []
+            failure_message = (
+                "Unable to query cyclic historian data through ODBC. Verify the "
+                "AVEVA WideHistory linked-server path, permissions, and retrieval "
+                "settings."
+            )
+        else:
+            sql = self._build_delta_query(tag_count=len(query.tags))
+            parameters = [*query.tags, query.start_datetime, query.end_datetime]
+            failure_message = (
                 "Unable to query delta historian data through ODBC. Verify the AVEVA"
                 " Historian schema, permissions, and retrieval settings."
-            ),
+            )
+
+        query_start = perf_counter()
+        raw_rows = self._execute_query(
+            sql,
+            parameters=parameters,
+            failure_message=failure_message,
         )
-        return self._build_preview_rows(rows)
+        query_duration = perf_counter() - query_start
+        raw_row_count = len(raw_rows)
+
+        rows_for_reshape = raw_rows
+        preview_truncated = False
+
+        if preview_row_cap is not None and raw_row_count > preview_row_cap:
+            rows_for_reshape = raw_rows[:preview_row_cap]
+            preview_truncated = True
+            logger.info(
+                "Truncated AVEVA ODBC preview result on DSN '%s' from %s raw rows "
+                "to %s raw rows before reshaping for %s tag(s) from %s to %s",
+                self._dsn,
+                raw_row_count,
+                preview_row_cap,
+                len(query.tags),
+                query.start_datetime.isoformat(),
+                query.end_datetime.isoformat(),
+            )
+
+        reshape_start = perf_counter()
+        if query.retrieval_mode == RetrievalMode.cyclic:
+            preview_rows = self._build_cyclic_preview_rows(rows_for_reshape, query.tags)
+        else:
+            preview_rows = self._build_preview_rows(rows_for_reshape)
+        reshape_duration = perf_counter() - reshape_start
+        total_duration = perf_counter() - total_start
+
+        logger.info(
+            "Completed AVEVA ODBC %s for %s tag(s) on DSN '%s' from %s to %s "
+            "with query duration %.3fs, raw row count %s, reshape duration %.3fs, "
+            "result row count %s, total duration %.3fs, preview truncated=%s",
+            operation_name,
+            len(query.tags),
+            self._dsn,
+            query.start_datetime.isoformat(),
+            query.end_datetime.isoformat(),
+            query_duration,
+            raw_row_count,
+            reshape_duration,
+            len(preview_rows),
+            total_duration,
+            preview_truncated,
+        )
+        return preview_rows
 
     def _build_delta_query(self, tag_count: int) -> str:
         tag_placeholders = ", ".join("?" for _ in range(tag_count))
@@ -131,6 +199,36 @@ class AvevaHistorianOdbcProvider(HistorianService):
               AND wwRetrievalMode = 'Delta'
             ORDER BY DateTime, TagName
         """
+
+    def _build_cyclic_query(self, query: HistorianQuery) -> str:
+        if query.resolution_milliseconds is None:
+            raise ConfigurationError(
+                "resolution_milliseconds is required when HISTORIAN_PROVIDER=aveva_odbc "
+                "uses cyclic retrieval."
+            )
+
+        wide_columns = ", ".join(
+            self._quote_sql_server_identifier(tag_name) for tag_name in query.tags
+        )
+        start_datetime = self._format_openquery_datetime(query.start_datetime)
+        end_datetime = self._format_openquery_datetime(query.end_datetime)
+        inner_query = (
+            f"SELECT DateTime, {wide_columns}, wwResolution "
+            "FROM WideHistory "
+            "WHERE wwRetrievalMode = 'Cyclic' "
+            f"AND wwResolution = {query.resolution_milliseconds} "
+            "AND wwQualityRule = 'Extended' "
+            "AND wwVersion = 'Latest' "
+            f"AND DateTime >= '{start_datetime}' "
+            f"AND DateTime <= '{end_datetime}'"
+        )
+        escaped_inner_query = inner_query.replace("'", "''")
+
+        return (
+            "SELECT * "
+            f"FROM OPENQUERY(INSQL, '{escaped_inner_query}') "
+            "ORDER BY DateTime DESC"
+        )
 
     def _execute_query(
         self,
@@ -220,6 +318,34 @@ class AvevaHistorianOdbcProvider(HistorianService):
             PreviewRow(timestamp=timestamp, values=values)
             for timestamp, values in rows_by_timestamp.items()
         ]
+
+    @staticmethod
+    def _build_cyclic_preview_rows(
+        rows: list[dict[str, Any]],
+        ordered_tags: list[TagName],
+    ) -> list[PreviewRow]:
+        preview_rows: list[PreviewRow] = []
+
+        for row in rows:
+            timestamp = AvevaHistorianOdbcProvider._coerce_timestamp(row.get("datetime"))
+            if timestamp is None:
+                continue
+
+            values = {
+                tag_name: row.get(tag_name.lower())
+                for tag_name in ordered_tags
+            }
+            preview_rows.append(PreviewRow(timestamp=timestamp, values=values))
+
+        return preview_rows
+
+    @staticmethod
+    def _quote_sql_server_identifier(identifier: str) -> str:
+        return f"[{identifier.replace(']', ']]')}]"
+
+    @staticmethod
+    def _format_openquery_datetime(value: datetime) -> str:
+        return value.astimezone().strftime("%Y%m%d %H:%M:%S.%f")[:-3]
 
     @staticmethod
     def _coerce_timestamp(value: Any) -> datetime | None:

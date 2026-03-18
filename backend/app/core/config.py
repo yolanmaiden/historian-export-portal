@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     historian_odbc_uid: str | None = None
     historian_odbc_pwd: str | None = None
     historian_query_timeout_seconds: int = 30
+    historian_preview_max_rows: int = 1000
 
     model_config = SettingsConfigDict(
         env_file=".env",
