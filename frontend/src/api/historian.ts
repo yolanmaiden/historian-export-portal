@@ -1,9 +1,14 @@
 import { requestBlob, requestJson } from "./client";
-import type { ExportRequest, PreviewRequest, PreviewResponse, TagInfo } from "../types/historian";
+import type {
+  ExportRequest,
+  PreviewRequest,
+  PreviewResponse,
+  TagMetadata,
+} from "../types/historian";
 
 
-export function fetchTags(): Promise<TagInfo[]> {
-  return requestJson<TagInfo[]>("/tags");
+export function fetchTags(): Promise<TagMetadata[]> {
+  return requestJson<TagMetadata[]>("/tags");
 }
 
 export function previewData(request: PreviewRequest): Promise<PreviewResponse> {

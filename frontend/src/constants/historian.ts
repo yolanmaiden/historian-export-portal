@@ -5,7 +5,8 @@ export const RETRIEVAL_OPTIONS: ReadonlyArray<{
   label: string;
   value: RetrievalSelection;
 }> = [
-  { label: "Raw/Delta", value: "delta" },
+  { label: "Raw", value: "raw" },
+  { label: "Delta", value: "delta" },
   { label: "1 second cyclic", value: "cyclic-1s" },
 ];
 

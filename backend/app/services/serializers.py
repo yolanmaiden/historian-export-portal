@@ -1,12 +1,13 @@
 import csv
 from io import StringIO
+from typing import Any, Iterable
 
 from app.domain.historian import TIMESTAMP_COLUMN, TagName
-from app.schemas.historian import HistorianQuery, PreviewResponse, PreviewRow
+from app.schemas.historian import HistorianQuery, PreviewResponse, PreviewRow, TagMetadata
 
 
 def build_preview_columns(request: HistorianQuery) -> list[str]:
-    return [TIMESTAMP_COLUMN, *[tag.value for tag in request.tags]]
+    return [TIMESTAMP_COLUMN, *request.tags]
 
 
 def build_export_row(row: PreviewRow, ordered_tags: list[TagName]) -> list[object]:
@@ -24,6 +25,10 @@ def build_preview_response(
         columns=build_preview_columns(request),
         rows=rows,
     )
+
+
+def build_tag_metadata_response(tags: Iterable[TagMetadata | dict[str, Any]]) -> list[TagMetadata]:
+    return [TagMetadata.model_validate(tag) for tag in tags]
 
 
 def build_csv_export(request: HistorianQuery, rows: list[PreviewRow]) -> str:

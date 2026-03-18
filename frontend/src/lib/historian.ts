@@ -4,11 +4,12 @@ import type {
   PreviewColumn,
   PreviewRequest,
   RetrievalMode,
+  TagMetadata,
   TagName,
 } from "../types/historian";
 
 export const DEFAULT_SELECTED_TAGS: TagName[] = ["PT_1001", "TT_1002"];
-export type RetrievalSelection = "delta" | "cyclic-1s";
+export type RetrievalSelection = "raw" | "delta" | "cyclic-1s";
 
 export interface HistorianQueryFormState {
   startDatetime: string;
@@ -27,8 +28,49 @@ interface RetrievalParameters {
   cycleSeconds: number | null;
 }
 
+function normalizeText(value: string | null | undefined): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+export function getTagIdentifier(
+  tag: Pick<TagMetadata, "tag_name" | "name">,
+): TagName {
+  return normalizeText(tag.tag_name) || normalizeText(tag.name);
+}
+
+export function normalizeTagMetadata(tag: TagMetadata): TagMetadata | null {
+  const tagName = getTagIdentifier(tag);
+
+  if (!tagName) {
+    return null;
+  }
+
+  return {
+    tag_name: tagName,
+    description: normalizeText(tag.description),
+    io_address: normalizeText(tag.io_address) || null,
+    units: normalizeText(tag.units) || normalizeText(tag.engineering_unit) || null,
+    source_system: normalizeText(tag.source_system) || null,
+  };
+}
+
+export function normalizeTagMetadataList(tags: TagMetadata[]): TagMetadata[] {
+  const tagsByIdentifier = new Map<TagName, TagMetadata>();
+
+  for (const tag of tags) {
+    const normalizedTag = normalizeTagMetadata(tag);
+    if (!normalizedTag) {
+      continue;
+    }
+
+    tagsByIdentifier.set(getTagIdentifier(normalizedTag), normalizedTag);
+  }
+
+  return [...tagsByIdentifier.values()];
+}
+
 export function getPreviewValueColumns(columns: PreviewColumn[]): TagName[] {
-  return columns.filter((column): column is TagName => column !== "timestamp");
+  return columns.filter((column) => column !== "timestamp");
 }
 
 export function toggleTagSelection(selectedTags: TagName[], tagName: TagName): TagName[] {
@@ -37,9 +79,33 @@ export function toggleTagSelection(selectedTags: TagName[], tagName: TagName): T
     : [...selectedTags, tagName];
 }
 
+export function matchesTagSearch(tag: TagMetadata, searchText: string): boolean {
+  const normalizedSearchText = searchText.trim().toLowerCase();
+  if (!normalizedSearchText) {
+    return true;
+  }
+
+  const searchableValues = [
+    normalizeText(tag.tag_name),
+    normalizeText(tag.description),
+    normalizeText(tag.source_system),
+    normalizeText(tag.io_address),
+    normalizeText(tag.units),
+  ];
+
+  return searchableValues.some((value) => value.toLowerCase().includes(normalizedSearchText));
+}
+
 export function getRetrievalParameters(
   retrievalSelection: RetrievalSelection,
 ): RetrievalParameters {
+  if (retrievalSelection === "raw") {
+    return {
+      retrievalMode: "raw",
+      cycleSeconds: null,
+    };
+  }
+
   if (retrievalSelection === "cyclic-1s") {
     return {
       retrievalMode: "cyclic",

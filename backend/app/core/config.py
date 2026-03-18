@@ -8,6 +8,10 @@ class Settings(BaseSettings):
     backend_port: int = 8010
     frontend_origin: str = "http://127.0.0.1:5173"
     historian_provider: str = "mock"
+    historian_odbc_dsn: str | None = None
+    historian_odbc_uid: str | None = None
+    historian_odbc_pwd: str | None = None
+    historian_query_timeout_seconds: int = 30
 
     model_config = SettingsConfigDict(
         env_file=".env",

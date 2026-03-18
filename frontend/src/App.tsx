@@ -13,6 +13,9 @@ import {
   downloadBlob,
   getExportFilename,
   getPreviewValueColumns,
+  getTagIdentifier,
+  matchesTagSearch,
+  normalizeTagMetadataList,
   toggleTagSelection,
   type HistorianQueryFormState,
   type RetrievalSelection,
@@ -20,14 +23,15 @@ import {
 import type {
   OutputFormat,
   PreviewResponse,
-  TagInfo,
+  TagMetadata,
   TagName,
 } from "./types/historian";
 
 export default function App() {
   const defaultWindow = buildDefaultWindow();
-  const [availableTags, setAvailableTags] = useState<TagInfo[]>([]);
+  const [availableTags, setAvailableTags] = useState<TagMetadata[]>([]);
   const [selectedTags, setSelectedTags] = useState<TagName[]>(DEFAULT_SELECTED_TAGS);
+  const [tagSearchText, setTagSearchText] = useState("");
   const [startDatetime, setStartDatetime] = useState(defaultWindow.start);
   const [endDatetime, setEndDatetime] = useState(defaultWindow.end);
   const [retrievalSelection, setRetrievalSelection] =
@@ -42,7 +46,7 @@ export default function App() {
     async function loadTags() {
       try {
         const result = await fetchTags();
-        setAvailableTags(result);
+        setAvailableTags(normalizeTagMetadataList(result));
       } catch (loadError) {
         setErrorMessage(
           loadError instanceof Error ? loadError.message : "Failed to load tags.",
@@ -52,6 +56,9 @@ export default function App() {
 
     void loadTags();
   }, []);
+
+  const filteredTags = availableTags.filter((tag) => matchesTagSearch(tag, tagSearchText));
+  const selectedTagIds = new Set(selectedTags);
 
   function buildFormState(): HistorianQueryFormState {
     return {
@@ -194,24 +201,43 @@ export default function App() {
             <div className="tag-panel">
               <div className="field-header">
                 <span>Tag selector</span>
-                <small>Choose one or more historian tags.</small>
+                <small>Search and choose one or more historian tags.</small>
+              </div>
+              <div className="tag-toolbar">
+                <input
+                  className="tag-search"
+                  type="search"
+                  placeholder="Search tag name, description, or source system"
+                  value={tagSearchText}
+                  onChange={(event) => setTagSearchText(event.target.value)}
+                />
+                <small>{filteredTags.length} tags shown</small>
               </div>
               <div className="tag-grid">
-                {availableTags.map((tag) => (
-                  <label key={tag.name} className="tag-card">
+                {filteredTags.map((tag) => (
+                  <label key={getTagIdentifier(tag)} className="tag-card">
                     <input
                       type="checkbox"
-                      checked={selectedTags.includes(tag.name)}
-                      onChange={() => toggleTag(tag.name)}
+                      checked={selectedTagIds.has(getTagIdentifier(tag))}
+                      onChange={() => toggleTag(getTagIdentifier(tag))}
                     />
-                    <div>
-                      <strong>{tag.name}</strong>
-                      <span>{tag.description}</span>
+                    <div className="tag-copy">
+                      <strong>{getTagIdentifier(tag)}</strong>
+                      <span>{tag.description || "No description available."}</span>
                     </div>
-                    <em>{tag.engineering_unit}</em>
+                    <div className="tag-meta">
+                      {tag.source_system ? (
+                        <span className="tag-source">{tag.source_system}</span>
+                      ) : null}
+                    </div>
                   </label>
                 ))}
               </div>
+              {!filteredTags.length ? (
+                <div className="tag-empty-state">
+                  <p>No tags match the current search.</p>
+                </div>
+              ) : null}
             </div>
 
             {errorMessage ? <p className="message error">{errorMessage}</p> : null}
@@ -255,8 +281,10 @@ export default function App() {
                   {previewResponse.rows.map((row) => (
                     <tr key={row.timestamp}>
                       <td>{new Date(row.timestamp).toLocaleString()}</td>
-                      {getPreviewValueColumns(previewResponse.columns).map((tag) => (
-                        <td key={`${row.timestamp}-${tag}`}>{String(row.values[tag] ?? "")}</td>
+                      {getPreviewValueColumns(previewResponse.columns).map((tagName) => (
+                        <td key={`${row.timestamp}-${tagName}`}>
+                          {String(row.values[tagName] ?? "")}
+                        </td>
                       ))}
                     </tr>
                   ))}

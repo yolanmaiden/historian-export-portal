@@ -10,9 +10,13 @@ class ConfigurationError(AppError):
     status_code = 500
 
 
+class HistorianConnectionError(AppError):
+    status_code = 502
+
+
+class HistorianQueryError(AppError):
+    status_code = 502
+
+
 class UnsupportedExportFormatError(AppError):
-    status_code = 501
-
-
-class UnsupportedRetrievalModeError(AppError):
     status_code = 501

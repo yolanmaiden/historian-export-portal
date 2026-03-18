@@ -15,7 +15,7 @@ def preview_data(
     request: PreviewRequest,
     historian_service: HistorianServiceDep,
 ) -> PreviewResponse:
-    rows = historian_service.query_data(request)
+    rows = historian_service.preview_data(request)
     return build_preview_response(request, rows)
 
 
@@ -27,7 +27,7 @@ def export_data(
     if request.output_format == OutputFormat.xlsx:
         raise UnsupportedExportFormatError("XLSX export is not implemented yet.")
 
-    rows = historian_service.query_data(request)
+    rows = historian_service.export_data(request)
     csv_content = build_csv_export(request, rows)
     headers = {
         "Content-Disposition": (

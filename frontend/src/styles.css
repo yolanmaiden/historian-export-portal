@@ -122,6 +122,30 @@ select {
   margin-top: 20px;
 }
 
+.tag-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.tag-toolbar small {
+  color: #5f7287;
+}
+
+.tag-search {
+  padding: 12px 14px;
+  border: 1px solid #c9d8e7;
+  border-radius: 14px;
+  background: #f8fbfd;
+  color: #142235;
+}
+
+.tag-search:focus {
+  outline: 2px solid #7db4ff;
+  border-color: transparent;
+}
+
 .field-header {
   display: flex;
   flex-direction: column;
@@ -140,8 +164,8 @@ select {
 
 .tag-card {
   display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
   gap: 12px;
   padding: 14px 16px;
   border: 1px solid #d7e3ef;
@@ -154,15 +178,39 @@ select {
   block-size: 18px;
 }
 
-.tag-card div {
+.tag-copy {
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
-.tag-card span,
-.tag-card em {
+.tag-copy span {
   color: #65798e;
   font-size: 0.88rem;
+}
+
+.tag-meta {
+  display: flex;
+  align-items: center;
+}
+
+.tag-source {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #e7eef6;
+  color: #0f2743;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.tag-empty-state {
+  display: grid;
+  place-items: center;
+  min-height: 96px;
+  border: 1px dashed #bfd1e1;
+  border-radius: 16px;
+  color: #5f7287;
+  background: rgba(245, 250, 255, 0.72);
 }
 
 .message {
@@ -283,5 +331,13 @@ tbody tr:nth-child(even) {
 
   .actions {
     flex-direction: column;
+  }
+
+  .tag-card {
+    grid-template-columns: auto 1fr;
+  }
+
+  .tag-meta {
+    grid-column: 2;
   }
 }
