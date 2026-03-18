@@ -31,6 +31,7 @@ const QUICK_PRESET_OPTIONS: ReadonlyArray<{ label: string; minutes: number }> = 
   { label: "30m", minutes: 30 },
   { label: "1h", minutes: 60 },
 ];
+const DEFAULT_PRESET_MINUTES = 15;
 
 export default function App() {
   const defaultWindow = buildDefaultWindow();
@@ -40,6 +41,8 @@ export default function App() {
   const [showSystemTags, setShowSystemTags] = useState(false);
   const [startDatetime, setStartDatetime] = useState(defaultWindow.start);
   const [endDatetime, setEndDatetime] = useState(defaultWindow.end);
+  const [activePresetMinutes, setActivePresetMinutes] =
+    useState<number | null>(DEFAULT_PRESET_MINUTES);
   const [resolutionMilliseconds, setResolutionMilliseconds] = useState("1000");
   const [outputFormat, setOutputFormat] = useState<OutputFormat>("csv");
   const [previewResponse, setPreviewResponse] = useState<PreviewResponse | null>(null);
@@ -104,6 +107,7 @@ export default function App() {
     const nextWindow = buildRelativeWindow(minutes);
     setStartDatetime(nextWindow.start);
     setEndDatetime(nextWindow.end);
+    setActivePresetMinutes(minutes);
   }
 
   function preparePreviewRequest() {
@@ -187,7 +191,10 @@ export default function App() {
                 <input
                   type="datetime-local"
                   value={startDatetime}
-                  onChange={(event) => setStartDatetime(event.target.value)}
+                  onChange={(event) => {
+                    setStartDatetime(event.target.value);
+                    setActivePresetMinutes(null);
+                  }}
                 />
               </label>
 
@@ -196,7 +203,10 @@ export default function App() {
                 <input
                   type="datetime-local"
                   value={endDatetime}
-                  onChange={(event) => setEndDatetime(event.target.value)}
+                  onChange={(event) => {
+                    setEndDatetime(event.target.value);
+                    setActivePresetMinutes(null);
+                  }}
                 />
               </label>
 
@@ -241,7 +251,7 @@ export default function App() {
                   <button
                     key={preset.label}
                     type="button"
-                    className="preset-button"
+                    className={`preset-button${activePresetMinutes === preset.minutes ? " is-active" : ""}`}
                     onClick={() => applyQuickPreset(preset.minutes)}
                   >
                     {preset.label}
