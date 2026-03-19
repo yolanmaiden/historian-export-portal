@@ -24,6 +24,7 @@ import type {
   PreviewResponse,
   TagMetadata,
   TagName,
+  TagSystem,
 } from "./types/historian";
 
 const QUICK_PRESET_OPTIONS: ReadonlyArray<{ label: string; minutes: number }> = [
@@ -34,6 +35,14 @@ const QUICK_PRESET_OPTIONS: ReadonlyArray<{ label: string; minutes: number }> = 
   { label: "1h", minutes: 60 },
 ];
 const DEFAULT_PRESET_MINUTES = 15;
+type TagSystemFilter = "All" | Exclude<TagSystem, "Unknown">;
+
+const TAG_SYSTEM_FILTER_OPTIONS: ReadonlyArray<TagSystemFilter> = [
+  "All",
+  "Gen 2",
+  "DeltaV BMS/FARC",
+  "SFR",
+];
 
 export default function App() {
   const defaultWindow = buildDefaultWindow();
@@ -41,6 +50,7 @@ export default function App() {
   const [selectedTags, setSelectedTags] = useState<TagName[]>(DEFAULT_SELECTED_TAGS);
   const [tagSearchText, setTagSearchText] = useState("");
   const [showSystemTags, setShowSystemTags] = useState(false);
+  const [systemFilter, setSystemFilter] = useState<TagSystemFilter>("All");
   const [startDatetime, setStartDatetime] = useState(defaultWindow.start);
   const [endDatetime, setEndDatetime] = useState(defaultWindow.end);
   const [activePresetMinutes, setActivePresetMinutes] =
@@ -79,6 +89,10 @@ export default function App() {
   );
   const filteredTags = availableTags.filter((tag) => {
     if (!showSystemTags && isSystemTag(tag)) {
+      return false;
+    }
+
+    if (systemFilter !== "All" && tag.system !== systemFilter) {
       return false;
     }
 
@@ -308,19 +322,37 @@ export default function App() {
                 <input
                   className="tag-search"
                   type="search"
-                  placeholder="Search tag name, description, or source system"
+                  placeholder="Search tag name, description, system, or units"
                   value={tagSearchText}
                   onChange={(event) => setTagSearchText(event.target.value)}
                 />
                 <div className="tag-toolbar-row">
-                  <label className="system-toggle">
-                    <input
-                      type="checkbox"
-                      checked={showSystemTags}
-                      onChange={(event) => setShowSystemTags(event.target.checked)}
-                    />
-                    <span>Show system tags</span>
-                  </label>
+                  <div className="tag-toolbar-filters">
+                    <label className="system-toggle">
+                      <input
+                        type="checkbox"
+                        checked={showSystemTags}
+                        onChange={(event) => setShowSystemTags(event.target.checked)}
+                      />
+                      <span>Show system tags</span>
+                    </label>
+                    <label className="tag-filter-control">
+                      <span>System</span>
+                      <select
+                        className="tag-filter-select"
+                        value={systemFilter}
+                        onChange={(event) =>
+                          setSystemFilter(event.target.value as TagSystemFilter)
+                        }
+                      >
+                        {TAG_SYSTEM_FILTER_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
                   <small>{filteredTags.length} tags shown</small>
                 </div>
               </div>
@@ -365,6 +397,9 @@ export default function App() {
                     {filteredTags.map((tag) => {
                       const tagName = getTagIdentifier(tag);
                       const isSelected = selectedTagIds.has(tagName);
+                      const metadataParts = [tag.system || "Unknown", tag.units].filter(
+                        (value): value is string => Boolean(value),
+                      );
 
                       return (
                         <label
@@ -379,11 +414,9 @@ export default function App() {
                           <div className="tag-copy">
                             <strong>{tagName}</strong>
                             <span>{tag.description || "No description available."}</span>
-                          </div>
-                          <div className="tag-meta">
-                            {tag.source_system ? (
-                              <span className="tag-source">{tag.source_system}</span>
-                            ) : null}
+                            <span className="tag-metadata-line">
+                              {metadataParts.join(" • ")}
+                            </span>
                           </div>
                         </label>
                       );

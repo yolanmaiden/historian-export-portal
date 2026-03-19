@@ -13,8 +13,11 @@ from app.domain.historian import (
     OutputFormat,
     RetrievalMode,
     ScalarValue,
+    TagSystem,
     TagName,
+    classify_tag_system,
     derive_source_system,
+    is_historian_system_tag,
 )
 
 
@@ -120,13 +123,15 @@ class TagMetadata(StrictModel):
         min_length=1,
         validation_alias=AliasChoices("tag_name", "name"),
     )
-    description: str = ""
+    description: str | None = None
     io_address: str | None = None
     units: str | None = Field(
         default=None,
         validation_alias=AliasChoices("units", "engineering_unit"),
     )
     source_system: str | None = None
+    system: TagSystem | None = None
+    is_system_tag: bool | None = None
 
     @field_validator("tag_name")
     @classmethod
@@ -136,21 +141,33 @@ class TagMetadata(StrictModel):
             raise ValueError("tag_name must not be empty.")
         return normalized_value
 
-    @field_validator("description")
-    @classmethod
-    def normalize_description(cls, value: str) -> str:
-        return value.strip()
-
-    @field_validator("io_address", "units", "source_system")
+    @field_validator("description", "io_address", "units", "source_system")
     @classmethod
     def normalize_optional_metadata(cls, value: str | None) -> str | None:
         if value is None:
             return None
         normalized_value = value.strip()
+        if normalized_value.lower() in {"none", "null"}:
+            return None
         return normalized_value or None
 
     @model_validator(mode="after")
-    def populate_source_system(self) -> "TagMetadata":
+    def populate_derived_metadata(self) -> "TagMetadata":
         if self.source_system is None:
             self.source_system = derive_source_system(self.io_address)
+        if self.is_system_tag is None:
+            self.is_system_tag = is_historian_system_tag(
+                self.tag_name,
+                source_system=self.source_system,
+            )
+        if self.is_system_tag:
+            self.source_system = TagSystem.historian_internal.value
+            self.system = TagSystem.historian_internal
+            return self
+        if self.system is None:
+            self.system = classify_tag_system(
+                self.tag_name,
+                description=self.description,
+                source_system=self.source_system,
+            )
         return self

@@ -6,6 +6,7 @@ import type {
   RetrievalMode,
   TagMetadata,
   TagName,
+  TagSystem,
 } from "../types/historian";
 
 export const DEFAULT_SELECTED_TAGS: TagName[] = [];
@@ -29,8 +30,36 @@ interface RetrievalParameters {
   resolutionMilliseconds: number | null;
 }
 
+const TAG_SYSTEM_VALUES = new Set<TagSystem>([
+  "Gen 2",
+  "DeltaV BMS/FARC",
+  "SFR",
+  "Historian Internal",
+  "Unknown",
+]);
+
 function normalizeText(value: string | null | undefined): string {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function tokenizeSearchValue(value: string): string[] {
+  return value
+    .toLowerCase()
+    .split(/[^a-z0-9]+/i)
+    .filter(Boolean);
+}
+
+function matchesShortSearchValue(value: string, searchText: string): boolean {
+  const normalizedValue = value.toLowerCase();
+  if (!normalizedValue) {
+    return false;
+  }
+
+  if (normalizedValue.startsWith(searchText)) {
+    return true;
+  }
+
+  return tokenizeSearchValue(value).some((token) => token.startsWith(searchText));
 }
 
 export function getTagIdentifier(
@@ -40,10 +69,26 @@ export function getTagIdentifier(
 }
 
 export function isSystemTag(
-  tag: Pick<TagMetadata, "tag_name" | "name">,
+  tag: Pick<TagMetadata, "tag_name" | "name" | "is_system_tag">,
 ): boolean {
+  if (typeof tag.is_system_tag === "boolean") {
+    return tag.is_system_tag;
+  }
+
   const normalizedTagName = getTagIdentifier(tag).toLowerCase();
-  return normalizedTagName.startsWith("$") || normalizedTagName.startsWith("sys");
+  return (
+    normalizedTagName.startsWith("$")
+    || normalizedTagName.startsWith("sys")
+    || normalizedTagName.startsWith("ww")
+    || normalizedTagName.startsWith("system")
+  );
+}
+
+function normalizeTagSystem(value: TagSystem | string | null | undefined): TagSystem | null {
+  const normalizedValue = normalizeText(value);
+  return TAG_SYSTEM_VALUES.has(normalizedValue as TagSystem)
+    ? (normalizedValue as TagSystem)
+    : null;
 }
 
 export function normalizeTagMetadata(tag: TagMetadata): TagMetadata | null {
@@ -59,6 +104,8 @@ export function normalizeTagMetadata(tag: TagMetadata): TagMetadata | null {
     io_address: normalizeText(tag.io_address) || null,
     units: normalizeText(tag.units) || normalizeText(tag.engineering_unit) || null,
     source_system: normalizeText(tag.source_system) || null,
+    system: normalizeTagSystem(tag.system) || "Unknown",
+    is_system_tag: typeof tag.is_system_tag === "boolean" ? tag.is_system_tag : isSystemTag(tag),
   };
 }
 
@@ -96,10 +143,15 @@ export function matchesTagSearch(tag: TagMetadata, searchText: string): boolean 
   const searchableValues = [
     normalizeText(tag.tag_name),
     normalizeText(tag.description),
-    normalizeText(tag.source_system),
-    normalizeText(tag.io_address),
+    normalizeText(tag.system),
     normalizeText(tag.units),
   ];
+
+  if (normalizedSearchText.length <= 2) {
+    return searchableValues.some((value) =>
+      matchesShortSearchValue(value, normalizedSearchText),
+    );
+  }
 
   return searchableValues.some((value) => value.toLowerCase().includes(normalizedSearchText));
 }

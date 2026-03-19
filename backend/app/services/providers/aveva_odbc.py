@@ -54,14 +54,64 @@ class AvevaHistorianOdbcProvider(HistorianService):
         )
         rows = self._execute_query(
             """
-            SELECT TOP 500
-                TagName AS tag_name,
-                Description AS description,
-                NULL AS io_address,
-                NULL AS units
-            FROM Runtime.dbo.Tag
-            WHERE TagName NOT LIKE '$%'
-            ORDER BY TagName
+            SELECT TOP 1000
+                tag.TagName AS tag_name,
+                NULLIF(LTRIM(RTRIM(tag.Description)), '') AS description,
+                CASE
+                    WHEN iodriver.ComputerName IS NULL
+                      OR ioserver.ComputerName IS NULL
+                      OR ioserver.ApplicationName IS NULL
+                      OR topic.Name IS NULL
+                      OR tag.ItemName IS NULL
+                    THEN NULL
+                    ELSE RTRIM(
+                        CONCAT(
+                            '//',
+                            iodriver.ComputerName,
+                            '/',
+                            ioserver.ComputerName,
+                            '/',
+                            ioserver.ApplicationName,
+                            '|',
+                            topic.Name,
+                            '!',
+                            tag.ItemName
+                        )
+                    )
+                END AS io_address,
+                COALESCE(
+                    NULLIF(LTRIM(RTRIM(localized_units.Unit)), ''),
+                    NULLIF(LTRIM(RTRIM(engineering_unit.Unit)), '')
+                ) AS units,
+                COALESCE(
+                    NULLIF(LTRIM(RTRIM(replication_tag.SourceServer)), ''),
+                    NULLIF(LTRIM(RTRIM(topic.Name)), ''),
+                    NULLIF(LTRIM(RTRIM(ioserver.ApplicationName)), ''),
+                    NULLIF(LTRIM(RTRIM(ioserver.ComputerName)), '')
+                ) AS source_system
+            FROM Runtime.dbo.Tag AS tag
+            LEFT JOIN (
+                SELECT
+                    TagName,
+                    MAX(NULLIF(LTRIM(RTRIM(Unit)), '')) AS Unit
+                FROM Runtime.dbo.TagLocalizedPropertyInfo
+                GROUP BY TagName
+            ) AS localized_units
+                ON localized_units.TagName = tag.TagName
+            LEFT JOIN Runtime.dbo.AnalogTag AS analog_tag
+                ON analog_tag.TagName = tag.TagName
+            LEFT JOIN Runtime.dbo.EngineeringUnit AS engineering_unit
+                ON engineering_unit.EUKey = analog_tag.EUKey
+            LEFT JOIN Runtime.dbo.Topic AS topic
+                ON topic.TopicKey = tag.TopicKey
+            LEFT JOIN Runtime.dbo.IOServer AS ioserver
+                ON ioserver.IOServerKey = tag.IOServerKey
+               AND ioserver.IOServerKey = topic.IOServerKey
+            LEFT JOIN Runtime.dbo.IODriver AS iodriver
+                ON iodriver.IODriverKey = ioserver.IODriverKey
+            LEFT JOIN Runtime.dbo.ReplicationTag AS replication_tag
+                ON replication_tag.TagName = tag.TagName
+            ORDER BY tag.TagName
             """,
             parameters=(),
             failure_message=(
@@ -73,9 +123,10 @@ class AvevaHistorianOdbcProvider(HistorianService):
         return [
             TagMetadata(
                 tag_name=str(row.get("tag_name") or ""),
-                description=str(row.get("description") or ""),
+                description=self._coerce_optional_text(row.get("description")),
                 io_address=self._coerce_optional_text(row.get("io_address")),
                 units=self._coerce_optional_text(row.get("units")),
+                source_system=self._coerce_optional_text(row.get("source_system")),
             )
             for row in rows
             if row.get("tag_name")

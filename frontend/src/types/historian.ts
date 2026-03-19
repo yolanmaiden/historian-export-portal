@@ -3,6 +3,12 @@ export type RetrievalMode = "raw" | "delta" | "cyclic";
 export type OutputFormat = "csv" | "xlsx";
 export type ScalarValue = string | number | boolean | null;
 export type PreviewColumn = string;
+export type TagSystem =
+  | "Gen 2"
+  | "DeltaV BMS/FARC"
+  | "SFR"
+  | "Historian Internal"
+  | "Unknown";
 
 export interface TagMetadata {
   tag_name?: TagName | null;
@@ -12,6 +18,8 @@ export interface TagMetadata {
   units?: string | null;
   engineering_unit?: string | null;
   source_system?: string | null;
+  system?: TagSystem | null;
+  is_system_tag?: boolean | null;
 }
 
 export interface HistorianQuery {
