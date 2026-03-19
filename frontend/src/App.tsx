@@ -1,6 +1,8 @@
 import { FormEvent, useEffect, useState } from "react";
 
 import { exportData, fetchTags, previewData } from "./api/historian";
+import ekonaMarkWhite from "./assets/logos/Ekona E White.png";
+import ekonaLogoWhite from "./assets/logos/Ekona_Logo_White.png";
 import { OUTPUT_FORMAT_OPTIONS } from "./constants/historian";
 import { buildDefaultWindow, buildRelativeWindow } from "./lib/datetime";
 import {
@@ -172,12 +174,24 @@ export default function App() {
   return (
     <div className="app-shell">
       <header className="hero">
+        <div className="hero-brand">
+          <img
+            className="hero-logo hero-logo-full"
+            src={ekonaLogoWhite}
+            alt="Ekona"
+          />
+          <img
+            className="hero-logo hero-logo-mark"
+            src={ekonaMarkWhite}
+            alt="Ekona"
+          />
+          <span className="hero-badge">Internal Engineering Utility</span>
+        </div>
         <div>
-          <p className="eyebrow">Internal Engineering Portal</p>
+          <p className="eyebrow">Ekona Utility Dashboard</p>
           <h1>Historian Export Portal</h1>
           <p className="hero-copy">
-            Search live historian tags, preview time-series results, and export
-            the selected window for downstream analysis.
+            Cyclic historian query and export workspace for internal engineering use.
           </p>
         </div>
       </header>
@@ -404,17 +418,22 @@ export default function App() {
               <table>
                 <thead>
                   <tr>
-                    {previewResponse.columns.map((column) => (
-                      <th key={column}>{column}</th>
+                    {previewResponse.columns.map((column, index) => (
+                      <th
+                        key={column}
+                        className={index === 0 ? "timestamp-cell" : "value-cell"}
+                      >
+                        {column}
+                      </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {previewResponse.rows.map((row) => (
                     <tr key={row.timestamp}>
-                      <td>{new Date(row.timestamp).toLocaleString()}</td>
+                      <td className="timestamp-cell">{new Date(row.timestamp).toLocaleString()}</td>
                       {getPreviewValueColumns(previewResponse.columns).map((tagName) => (
-                        <td key={`${row.timestamp}-${tagName}`}>
+                        <td key={`${row.timestamp}-${tagName}`} className="value-cell">
                           {String(row.values[tagName] ?? "")}
                         </td>
                       ))}
