@@ -24,6 +24,16 @@ def register_exception_handlers(app: FastAPI) -> None:
             content={"detail": exc.detail},
         )
 
+    @app.exception_handler(NotImplementedError)
+    async def handle_not_implemented_error(
+        _: Request,
+        exc: NotImplementedError,
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=501,
+            content={"detail": str(exc) or "This operation is not implemented yet."},
+        )
+
     @app.exception_handler(RequestValidationError)
     async def handle_request_validation_error(
         _: Request,
